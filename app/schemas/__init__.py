@@ -8,6 +8,12 @@ from .transaction import (
     TransactionSummary,
     TransactionFilters
 )
+from .receipt import (
+    ReceiptData,
+    ReceiptItem,
+    ReceiptAnalysisResponse,
+    ErrorResponse
+)
 
 __all__ = [
     "TransactionCreate",
@@ -17,5 +23,9 @@ __all__ = [
     "TransactionType",
     "TransactionListResponse",
     "TransactionSummary",
-    "TransactionFilters"
+    "TransactionFilters",
+    "ReceiptData",
+    "ReceiptItem",
+    "ReceiptAnalysisResponse",
+    "ErrorResponse"
 ]

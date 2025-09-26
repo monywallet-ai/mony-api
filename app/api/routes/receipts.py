@@ -1,12 +1,14 @@
 import mimetypes
 import base64
 import json
+from typing import List
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from openai import OpenAI
 
 from app.settings import settings
+from app.schemas.receipt import ReceiptAnalysisResponse, ErrorResponse
 
-router = APIRouter(tags=["Receipts"])
+router = APIRouter(prefix="/receipts", tags=["Receipts"])
 
 client = OpenAI(
     api_key=settings.OPEN_AI_SECRET_KEY,
@@ -112,30 +114,64 @@ EXAMPLE:
 """
 
 
-@router.post("/receipts")
-async def upload_receipt(
+@router.post(
+    "/",
+    response_model=ReceiptAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Analyze receipt image",
+    description="Upload a receipt image and extract structured data using AI analysis.",
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request - invalid file or format"},
+        413: {"model": ErrorResponse, "description": "File too large"},
+        422: {"model": ErrorResponse, "description": "Unprocessable entity - unsupported file type"},
+        500: {"model": ErrorResponse, "description": "Internal server error - AI analysis failed"}
+    }
+)
+async def analyze_receipt(
     receipt: UploadFile = File(
-        title="Receipt file",
-        description="Receipt file",
+        ...,
+        description="Receipt image file (PNG, JPEG, or JPG format, max 10MB)",
+        media_type="image/*"
     ),
-):
+) -> ReceiptAnalysisResponse:
+    """
+    Upload and analyze a receipt image to extract structured financial data.
+
+    This endpoint uses AI to process receipt images and extract key information including:
+    - Merchant name and transaction details
+    - Date, amount, and currency
+    - Payment method and category classification
+    - Individual items with prices (when available)
+    - Tax information
+
+    **Supported formats:** PNG, JPEG, JPG
+    **Maximum file size:** 10MB
+    **Languages:** Auto-detected (English, Spanish, French, Portuguese, etc.)
+
+    **Categories include:**
+    - groceries, dining, gas, healthcare, shopping
+    - electronics, home, clothing, utilities, entertainment
+    - travel, education, transportation
+
+    **Returns structured data** that can be used to create transactions automatically.
+    """
     if not receipt.filename or receipt.filename == "":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No file provided",
+            detail="No file provided"
         )
 
     file_type, _ = mimetypes.guess_type(receipt.filename)
     if not file_type or file_type not in ALLOWED_FILE_TYPES:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file type",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_FILE_TYPES)}"
         )
 
-    if receipt.size > MAX_FILE_SIZE:
+    if receipt.size and receipt.size > MAX_FILE_SIZE:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File too large",
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File too large. Maximum size allowed: {MAX_FILE_SIZE // (1024 * 1024)}MB"
         )
 
     file_content = await receipt.read()
@@ -172,23 +208,21 @@ async def upload_receipt(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error calling OpenAI API: {str(e)}",
+            detail=f"AI analysis failed: {str(e)}"
         )
 
     if not response.choices or not response.choices[0].message.content:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No receipt data found",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not extract receipt data from the provided image"
         )
 
     try:
         receipt_data = json.loads(response.choices[0].message.content)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Invalid JSON response from OpenAI",
+            detail=f"Failed to parse AI response: {str(e)}"
         )
 
-    return {
-        "receipt": receipt_data,
-    }
+    return ReceiptAnalysisResponse(receipt=receipt_data)
