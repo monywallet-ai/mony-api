@@ -21,8 +21,16 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the SQLAlchemy URL from environment variable
-config.set_main_option("sqlalchemy.url", env_config("DATABASE_URL", default="postgresql://postgres:password@localhost:5432/mony_db"))
+# Set the SQLAlchemy URL from environment variable  
+database_url = env_config("DATABASE_URL", default="postgresql://postgres:password@localhost:5432/mony_db")
+# Convert to asyncpg URL for Alembic
+if database_url.startswith("postgresql://"):
+    # Replace the scheme to use asyncpg for Alembic
+    alembic_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
+else:
+    alembic_url = database_url
+
+config.set_main_option("sqlalchemy.url", alembic_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
