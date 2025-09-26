@@ -1,16 +1,32 @@
 # Mony API
 
-FastAPI-based REST API for intelligent receipt processing and expense management using OpenAI's vision capabilities.
+FastAPI-based REST API for intelligent receipt processing and comprehensive financial transaction management using OpenAI's vision capabilities.
 
 ## 🚀 Features
 
+### Receipt Processing
 - **Receipt Upload & Analysis**: Upload receipt images and extract structured data
 - **AI-Powered Processing**: Uses OpenAI GPT-4o-mini with vision for accurate receipt parsing
 - **Multi-language Support**: Automatically detects receipt language and responds accordingly
 - **Structured Data Extraction**: Extracts merchant, date, amounts, items, categories, and more
 - **Smart Categorization**: Automatically categorizes expenses (groceries, dining, gas, etc.)
 - **Currency Detection**: Supports multiple currencies with automatic detection
-- **JSON Response Format**: Clean, structured JSON responses for easy integration
+
+### Transaction Management
+- **Complete CRUD Operations**: Create, read, update, and delete financial transactions
+- **Advanced Filtering**: Filter transactions by type, category, merchant, date range, and currency
+- **Flexible Sorting**: Sort by any field in ascending or descending order
+- **Pagination Support**: Efficient pagination for large transaction datasets
+- **Search Functionality**: Full-text search across merchant, description, category, and reference numbers
+- **Monthly Summaries**: Comprehensive monthly reports with category breakdowns
+- **Statistics & Analytics**: Transaction totals by type and net worth calculations
+
+### Data Management
+- **Decimal Precision**: Accurate financial calculations using Decimal types
+- **JSONB Storage**: Efficient storage of transaction items with PostgreSQL JSONB
+- **Database Migrations**: Alembic-powered schema management
+- **Type Safety**: Comprehensive Pydantic schemas for data validation
+- **OpenAPI Documentation**: Auto-generated interactive API documentation
 
 ## 📋 Requirements
 
@@ -163,10 +179,22 @@ mony-api/
 │   ├── api/
 │   │   ├── main.py          # API router configuration
 │   │   └── routes/
-│   │       └── receipts.py  # Receipt processing endpoints
+│   │       ├── receipts.py  # Receipt processing endpoints
+│   │       └── transactions.py # Transaction management endpoints
+│   ├── crud/                # Database operations
+│   │   └── transaction.py   # Transaction CRUD operations
+│   ├── models/              # SQLAlchemy models
+│   │   ├── base.py          # Base model configuration
+│   │   └── transaction.py   # Transaction database model
+│   ├── schemas/             # Pydantic schemas
+│   │   ├── __init__.py      # Schema exports
+│   │   ├── receipt.py       # Receipt processing schemas
+│   │   └── transaction.py   # Transaction management schemas
+│   ├── database.py          # Database connection setup
 │   ├── main.py              # FastAPI application setup
 │   └── settings.py          # Configuration settings
 ├── alembic/                 # Database migration scripts
+│   ├── versions/            # Migration files
 │   ├── env.py               # Alembic configuration
 │   └── script.py.mako       # Migration template
 ├── tests/                   # Test suite
@@ -188,13 +216,14 @@ mony-api/
 
 The application uses Pydantic settings for configuration management. Key settings include:
 
-- **Database**: PostgreSQL connection settings with Alembic migrations
+- **Database**: PostgreSQL connection settings with Alembic migrations and JSONB support
 - **OpenAI**: API key and model configuration (GPT-4o-mini with vision)
 - **CORS**: Cross-origin request settings for frontend integration
 - **JWT**: Authentication token configuration
-- **File Upload**: Size limits and allowed file types
+- **File Upload**: Size limits and allowed file types for receipt images
 - **Azure Storage**: Optional cloud storage for production receipts
 - **Environment**: Support for local, staging, and production environments
+- **Decimal Precision**: Financial data handling with proper decimal precision
 
 ## 🧠 AI Processing
 
@@ -210,11 +239,12 @@ The receipt processing uses OpenAI's GPT-4o-mini model with vision capabilities 
 
 The API includes comprehensive error handling for:
 
-- Invalid file types or sizes
-- OpenAI API failures
-- JSON parsing errors
-- Missing or corrupted receipt data
-- Database connection issues
+- **File Upload**: Invalid file types, sizes, and missing files
+- **AI Processing**: OpenAI API failures and JSON parsing errors
+- **Data Validation**: Pydantic schema validation for all inputs and outputs
+- **Database Operations**: Connection issues, constraint violations, and transaction failures
+- **Business Logic**: Invalid transaction types, date ranges, and financial calculations
+- **HTTP Responses**: Proper status codes (400, 413, 422, 500) with detailed error messages
 
 ## 🧪 Testing
 
