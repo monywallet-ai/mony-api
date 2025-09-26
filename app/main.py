@@ -1,22 +1,32 @@
-from typing import IO, Annotated
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 
-app = FastAPI()
-
-FILE_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
-ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"]
-
-
-def validate_size(receipt: IO):
-
-    pass
+from app.api.main import api_router
+from app.settings import settings
 
 
-@app.post("/receipts")
-def upload_receipt(
-    receipt: Annotated[UploadFile, File(description="Receipt file")],
-):
+def custom_generate_unique_id(route: APIRoute) -> str:
+    if route.tags:
+        return f"{route.tags[0]}-{route.name}"
+    return route.name
 
-    return {
-        "receipt": receipt,
-    }
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.API_VERSION,
+    description="Mony API",
+    docs_url="/docs",
+    openapi_url="/openapi.json",
+    generate_unique_id_function=custom_generate_unique_id,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.all_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router, prefix="/api")
