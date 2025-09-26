@@ -1,0 +1,11 @@
+[project]
+name = "mony-api"
+version = "0.1.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.117.1",
+    "openai>=1.109.1",
+    "pydantic-settings>=2.11.0",
+]

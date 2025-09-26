@@ -1,33 +1,32 @@
-from typing import IO, Annotated
-from fastapi import FastAPI, File, UploadFile
-import os
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 
-app = FastAPI()
-
-FILE_SIZE_LIMIT = 1024 * 1024 * 10  # 10 MB
-ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"]
+from app.api.main import api_router
+from app.settings import settings
 
 
-def validate_size(receipt: IO):
+def custom_generate_unique_id(route: APIRoute) -> str:
+    if route.tags:
+        return f"{route.tags[0]}-{route.name}"
+    return route.name
 
-    pass
 
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.API_VERSION,
+    description="Mony API",
+    docs_url="/docs",
+    openapi_url="/openapi.json",
+    generate_unique_id_function=custom_generate_unique_id,
+)
 
-@app.post("/receipts")
-def upload_receipt(
-    receipt: Annotated[UploadFile, File(description="Receipt file")],
-):
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.all_cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    return {
-        "receipt": receipt,
-    }
-
-# Health check endpoint para monitoring
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "environment": os.getenv("ENVIRONMENT", "unknown"),
-        "version": "1.0.0"
-    }
-DATABASE_URL = os.getenv("DATABASE_URL")
+app.include_router(api_router, prefix="/api")
