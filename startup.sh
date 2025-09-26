@@ -12,9 +12,9 @@ else
     source /home/site/wwwroot/.venv/bin/activate
 fi
 
-# Ejecutar migraciones de base de datos
-echo "Running database migrations..."
-alembic upgrade head
+# Ejecutar migraciones de base de datos (comentado hasta tener modelos)
+echo "Skipping database migrations - no models defined yet..."
+# alembic upgrade head
 
 # Iniciar la aplicación
 echo "Starting application with gunicorn..."
