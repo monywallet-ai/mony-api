@@ -8,16 +8,16 @@ from .base import BaseModel
 
 
 class TransactionType(enum.Enum):
-    EXPENSE = "expense"
-    INCOME = "income"
-    SAVING = "saving"
-    INVESTMENT = "investment"
+    expense = "expense"
+    income = "income"
+    saving = "saving"
+    investment = "investment"
 
 
 class Transaction(BaseModel):
     __tablename__ = "transactions"
 
-    transaction_type = Column(Enum(TransactionType), nullable=False, default=TransactionType.EXPENSE)
+    transaction_type = Column(Enum(TransactionType), nullable=False, default=TransactionType.expense)
     merchant = Column(String(255), nullable=False)
     date = Column(Date, nullable=False)
     total_amount = Column(Numeric(15, 2), nullable=False)
