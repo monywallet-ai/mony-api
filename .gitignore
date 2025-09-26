@@ -174,3 +174,23 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# Project specific files
+*.log
+.DS_Store
+.vscode/settings.json
+
+# Local development
+.env.local
+.env.development
+.env.test
+
+# Terraform (if you put terraform files here)
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+
+# Azure specific
+.azure/
