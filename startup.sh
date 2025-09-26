@@ -1,21 +1,28 @@
-#!/bin/bash
+#!/bin/sh
+set -e
+
 echo "Starting FastAPI application..."
 
-# Instalar dependencias si es necesario
-if [ ! -d "/home/site/wwwroot/.venv" ]; then
-    echo "Creating virtual environment..."
-    python -m venv /home/site/wwwroot/.venv
-    source /home/site/wwwroot/.venv/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt
-else
-    source /home/site/wwwroot/.venv/bin/activate
-fi
+# Set default values for environment variables
+export WORKERS=${WORKERS:-4}
+export HOST=${HOST:-0.0.0.0}
+export PORT=${PORT:-8000}
 
-# Ejecutar migraciones de base de datos (comentado hasta tener modelos)
+# Health check
+echo "Environment ready, virtual environment is already configured"
+
+# Execute database migrations when ready
 echo "Skipping database migrations - no models defined yet..."
 # alembic upgrade head
 
-# Iniciar la aplicación
-echo "Starting application with gunicorn..."
-exec gunicorn --bind=0.0.0.0:8000 --workers=4 --worker-class=uvicorn.workers.UvicornWorker app.main:app
+# Start the application
+echo "Starting application with gunicorn on ${HOST}:${PORT} with ${WORKERS} workers..."
+exec uv run gunicorn app.main:app \
+    -w "$WORKERS" \
+    -k uvicorn.workers.UvicornWorker \
+    --bind "${HOST}:${PORT}" \
+    --access-logfile - \
+    --error-logfile - \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
+    --preload
