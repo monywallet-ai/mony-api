@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     PG_PASSWORD: str = ""
     PG_DB: str = ""
 
+    OPEN_AI_SECRET_KEY: str
+    OPEN_AI_MODEL: str = "gpt-4o-mini"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:

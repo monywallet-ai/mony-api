@@ -1,10 +1,116 @@
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
 import mimetypes
+import base64
+import json
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi.encoders import jsonable_encoder
+from openai import OpenAI
 
+from app.settings import settings
 
 router = APIRouter(tags=["Receipts"])
+
+client = OpenAI(
+    api_key=settings.OPEN_AI_SECRET_KEY,
+)
+
 MAX_FILE_SIZE = 1024 * 1024 * 10  # 10 MB
 ALLOWED_FILE_TYPES = ["image/png", "image/jpeg", "image/jpg"]
+
+SYSTEM_PROMPT = """
+You are an expert agent specialized in receipt and payment voucher analysis.
+Your task is to read receipt text and return structured information in JSON format.
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Date MUST be in YYYY-MM-DD format (e.g., "2024-01-15", NOT "01/15/2024" or "Jan 15, 2024")
+- Convert any date format to YYYY-MM-DD
+- If date is ambiguous, use the most recent logical date
+
+CURRENCY EXTRACTION:
+- ALWAYS include a currency field in the response
+- Extract the currency code (e.g., "USD", "EUR", "COP", "GBP", "PEN", etc.) from symbols or explicit mentions
+- Common currency symbols: $ = USD, € = EUR, £ = GBP, etc.
+- If no currency symbol is visible, use "USD" as default
+- Currency field should be the 3-letter code (ISO 4217 format)
+
+CATEGORIZATION RULES:
+- Grocery stores (Walmart, Target, Kroger, Safeway, Whole Foods, Trader Joe's, Costco, Sam's Club, Aldi, Publix, Wegmans, Éxito, Carulla, Jumbo): "groceries"
+- Restaurants/Fast food (McDonald's, Starbucks, Chipotle, Taco Bell, Subway, KFC, etc.): "dining"
+- Gas stations (Shell, Exxon, Chevron, BP, Speedway, Terpel, Petrobras, etc.): "gas"
+- Pharmacies (CVS, Walgreens, Rite Aid, Cruz Verde, Copidrogas, etc.): "healthcare"
+- Department stores (Macy's, Kohl's, JCPenney, Falabella, Liverpool, etc.): "shopping"
+- Electronics (Best Buy, Apple Store, Ktronix, etc.): "electronics"
+- Home improvement (Home Depot, Lowe's, Homecenter, etc.): "home"
+- Clothing (Gap, Old Navy, H&M, Zara, Arturo Calle, etc.): "clothing"
+- Online services (Amazon, eBay, MercadoLibre, etc.): "shopping"
+- Utilities (electric, gas, water, internet): "utilities"
+- Entertainment (movies, concerts, etc.): "entertainment"
+- Travel (hotels, airlines, etc.): "travel"
+- Education (schools, universities, courses): "education"
+- Public transportation (metro, bus, taxi, Uber): "transportation"
+- Other: Use your best judgment to categorize appropriately
+
+PAYMENT METHODS:
+Common values include "cash", "credit card", "debit card", "bank transfer", "check", "gift card", "digital wallet", "PSE", "Nequi", "Daviplata"
+
+FIELDS TO EXTRACT:
+
+merchant: Name of the store, company, or issuing entity.
+date: Issue date (ISO format: YYYY-MM-DD).
+total_amount: Total amount paid (as number, without symbols).
+currency: Currency in standard ISO format (e.g., "USD", "COP", "EUR", "PEN").
+payment_method: Payment method according to the options listed above.
+category: Expense category according to categorization rules.
+description: Brief summary of the receipt or service/product purchased (respond in the same language detected in the receipt/image).
+receipt_number: Receipt or invoice number (if present).
+taxes: Total tax or VAT amount (if present, as number).
+items: List of purchased products or services with:
+  - name: item name or description (in the same language detected in the receipt/image)
+  - quantity: quantity (if present, otherwise null)
+  - unit_price: unit price (if present, otherwise null)
+  - total_price: calculated subtotal per item (if present, otherwise null)
+
+ADDITIONAL INSTRUCTIONS:
+- If any field doesn't appear on the receipt, return it with null value
+- DO NOT invent values: if information doesn't exist, mark it as null
+- Extract all visible receipt information accurately
+- If information is not visible, use reasonable defaults or omit if not applicable
+- ALWAYS return valid and well-formatted JSON
+- Respond ONLY with valid JSON, no additional text
+- LANGUAGE DETECTION: Detect the language used in the receipt/image and respond with description and item names in that same language
+
+EXAMPLE:
+{
+  "merchant": "La Esperanza Supermarket",
+  "date": "2025-09-20",
+  "total_amount": 152000,
+  "currency": "COP",
+  "payment_method": "debit card",
+  "category": "groceries",
+  "description": "Purchase of groceries and household products",
+  "receipt_number": "FAC-908123",
+  "taxes": 19000,
+  "items": [
+    {
+      "name": "Rice 5kg",
+      "quantity": 1,
+      "unit_price": 25000,
+      "total_price": 25000
+    },
+    {
+      "name": "Oil 1L",
+      "quantity": 2,
+      "unit_price": 15000,
+      "total_price": 30000
+    },
+    {
+      "name": "Detergent 2kg",
+      "quantity": 1,
+      "unit_price": 20000,
+      "total_price": 20000
+    }
+  ]
+}
+"""
 
 
 @router.post("/receipts")
@@ -33,6 +139,57 @@ async def upload_receipt(
             detail="File too large",
         )
 
+    file_content = await receipt.read()
+    base64_image = base64.b64encode(file_content).decode("utf-8")
+
+    try:
+        response = client.chat.completions.create(
+            model=settings.OPEN_AI_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Extract receipt data from this image following the formatting and categorization rules.",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}",
+                            },
+                        },
+                    ],
+                },
+            ],
+            response_format={
+                "type": "json_object",
+            },
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error calling OpenAI API: {str(e)}",
+        )
+
+    if not response.choices or not response.choices[0].message.content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No receipt data found",
+        )
+
+    try:
+        receipt_data = json.loads(response.choices[0].message.content)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid JSON response from OpenAI",
+        )
+
     return {
-        "receipt": receipt,
+        "receipt": receipt_data,
     }
