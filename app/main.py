@@ -1,5 +1,6 @@
 from typing import IO, Annotated
 from fastapi import FastAPI, File, UploadFile
+import os
 
 app = FastAPI()
 
@@ -20,3 +21,13 @@ def upload_receipt(
     return {
         "receipt": receipt,
     }
+
+# Health check endpoint para monitoring
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "environment": os.getenv("ENVIRONMENT", "unknown"),
+        "version": "1.0.0"
+    }
+DATABASE_URL = os.getenv("DATABASE_URL")
