@@ -2,7 +2,6 @@ import mimetypes
 import base64
 import json
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from fastapi.encoders import jsonable_encoder
 from openai import OpenAI
 
 from app.settings import settings
