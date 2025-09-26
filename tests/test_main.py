@@ -16,5 +16,5 @@ def test_health_check():
 def test_upload_receipt_endpoint_exists():
     """Test that the upload receipt endpoint exists."""
     # This should return 422 (validation error) because no file is provided
-    response = client.post("/receipts")
+    response = client.post("/api/v1/receipts")
     assert response.status_code == 422  # Validation error expected

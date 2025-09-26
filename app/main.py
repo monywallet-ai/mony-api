@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
@@ -20,6 +21,27 @@ app = FastAPI(
     openapi_url="/openapi.json",
     generate_unique_id_function=custom_generate_unique_id,
 )
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "environment": settings.ENVIRONMENT,
+        "version": settings.API_VERSION.lstrip("/"),
+        "project": settings.PROJECT_NAME,
+        "debug": settings.DEBUG
+    }
+
+@app.get("/debug/config-sources")
+async def config_sources():
+    """Debug endpoint - shows where each configuration comes from"""
+    if not settings.DEBUG:
+        return {"error": "Debug mode is disabled"}
+    
+    return {
+        "config_sources": settings.get_config_source_info(),
+        "note": "This endpoint is only available in debug mode"
+    }
 
 app.add_middleware(
     CORSMiddleware,
