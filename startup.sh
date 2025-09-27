@@ -51,7 +51,11 @@ if [ ! -f "$REQUIREMENTS_HASH_FILE" ] || [ "$(cat $REQUIREMENTS_HASH_FILE)" != "
     
     # Clean problematic packages that might cause conflicts
     echo "Cleaning potentially problematic packages..."
-    pip uninstall -y websockets psycopg2 psycopg2-binary || true
+    pip uninstall -y websockets psycopg2 psycopg2-binary uvicorn || true
+    
+    # Force remove any corrupted websockets directories
+    rm -rf /home/site/wwwroot/.venv/lib/python*/site-packages/websockets* || true
+    rm -rf /home/site/wwwroot/.venv/lib/python*/site-packages/psycopg2* || true
     
     # Clean pip cache to ensure fresh installations
     pip cache purge || true
@@ -72,6 +76,15 @@ echo "Verifying psycopg2 installation..."
 if ! python -c "import psycopg2; print('psycopg2 version:', psycopg2.__version__)" 2>/dev/null; then
     echo "psycopg2 not found, installing..."
     pip install --no-cache-dir --force-reinstall psycopg2-binary==2.9.9
+fi
+
+# Verify websockets installation (critical for uvicorn)
+echo "Verifying websockets installation..."
+if ! python -c "from websockets.datastructures import Headers; print('websockets is working')" 2>/dev/null; then
+    echo "websockets appears corrupted, reinstalling..."
+    pip uninstall -y websockets || true
+    rm -rf /home/site/wwwroot/.venv/lib/python*/site-packages/websockets* || true
+    pip install --no-cache-dir --force-reinstall websockets
 fi
 
 # Run comprehensive dependency check
@@ -98,6 +111,31 @@ if [ -d "alembic/versions" ] && [ "$(ls -A alembic/versions)" ]; then
 else
     echo "No migration files found - skipping database migrations."
     echo "Run 'alembic revision --autogenerate -m \"Initial migration\"' to create your first migration."
+fi
+
+# Final verification before starting application
+echo "Final verification of critical components..."
+if ! python -c "
+import uvicorn
+import gunicorn
+from websockets.datastructures import Headers
+import psycopg2
+print('All critical components verified successfully!')
+" 2>/dev/null; then
+    echo "Critical components verification failed, attempting emergency repair..."
+    
+    # Emergency cleanup and reinstall
+    pip uninstall -y uvicorn gunicorn websockets psycopg2 psycopg2-binary || true
+    rm -rf /home/site/wwwroot/.venv/lib/python*/site-packages/uvicorn* || true
+    rm -rf /home/site/wwwroot/.venv/lib/python*/site-packages/gunicorn* || true
+    rm -rf /home/site/wwwroot/.venv/lib/python*/site-packages/websockets* || true
+    rm -rf /home/site/wwwroot/.venv/lib/python*/site-packages/psycopg2* || true
+    
+    # Reinstall critical packages
+    pip install --no-cache-dir --force-reinstall uvicorn[standard]==0.24.0
+    pip install --no-cache-dir --force-reinstall gunicorn==21.2.0
+    pip install --no-cache-dir --force-reinstall websockets==12.0
+    pip install --no-cache-dir --force-reinstall psycopg2-binary==2.9.9
 fi
 
 # Start the application
