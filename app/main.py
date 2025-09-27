@@ -43,6 +43,32 @@ async def config_sources():
         "note": "This endpoint is only available in debug mode"
     }
 
+@app.get("/debug/dependencies")
+async def dependencies_info():
+    """Debug endpoint - shows installed package versions"""
+    if not settings.DEBUG:
+        return {"error": "Debug mode is disabled"}
+    
+    import subprocess
+    import sys
+    
+    try:
+        result = subprocess.run([sys.executable, "-m", "pip", "list", "--format=json"], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            import json
+            packages = json.loads(result.stdout)
+            return {
+                "installed_packages": packages,
+                "total_packages": len(packages),
+                "python_version": sys.version,
+                "note": "This endpoint is only available in debug mode"
+            }
+        else:
+            return {"error": "Could not retrieve package information"}
+    except Exception as e:
+        return {"error": f"Error retrieving dependencies: {str(e)}"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.all_cors_origins,
