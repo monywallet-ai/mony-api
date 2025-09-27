@@ -14,8 +14,6 @@ fi
 
 # Ejecutar migraciones de base de datos
 echo "Running database migrations..."
-alembic upgrade head
-# Ejecutar migraciones de base de datos (comentado hasta tener modelos)
 echo "Skipping database migrations - no models defined yet..."
 # alembic upgrade head
 
