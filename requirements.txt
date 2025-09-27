@@ -10,4 +10,3 @@ alembic==1.16.5
 openai>=1.109.1
 pydantic-settings>=2.11.0
 sqlalchemy>=2.0.43
-psycopg[binary]>=3.0.0
