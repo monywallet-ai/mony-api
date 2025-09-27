@@ -1,4 +1,4 @@
-name: Deploy to Development
+name: Deploy to Development (Normal)
 
 on:
   push:
@@ -12,6 +12,11 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+    
+    - name: Deploy Info
+      run: |
+        echo "🚀 Deploy normal a develop (SIN migraciones)"
+        echo "📅 Timestamp: $(date)"
     
     # - name: Setup Python
     #   uses: actions/setup-python@v5

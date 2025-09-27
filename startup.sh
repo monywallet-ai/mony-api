@@ -1,52 +1,47 @@
 #!/bin/bash
-set -e
+set -euxo pipefail   # e: stop on error; u: unset var = error; x: trace; o pipefail: pipeline errors
 
-echo "🚀 Fast deployment starting..."
+APP_DIR="/home/site/wwwroot"
+VENV_DIR="$APP_DIR/.venv"
 
-# Configure workers
-WORKERS=${WORKERS:-$([ "$ENVIRONMENT" = "production" ] && echo 4 || echo 3)}
-
-# Virtual environment setup
-VENV_PATH="/home/site/wwwroot/.venv"
-if [ ! -d "$VENV_PATH" ] || [ -f "/home/site/wwwroot/.venv_corrupt" ]; then
-    echo "� Creating clean venv..."
-    rm -rf "$VENV_PATH" /home/site/wwwroot/.venv_corrupt
-    python -m venv "$VENV_PATH"
+# --- 1. Virtualenv ----------------------------------------------------------
+if [ ! -d "$VENV_DIR" ]; then
+    echo "[INFO] Creando entorno virtual en $VENV_DIR"
+    python -m venv "$VENV_DIR"
 fi
-source "$VENV_PATH/bin/activate"
 
-# Aggressive dependency installation
-echo "⚡ Installing dependencies..."
-pip install --upgrade pip --quiet
-pip cache purge &>/dev/null || true
+source "$VENV_DIR/bin/activate"
 
-# Nuclear option: force reinstall everything
-pip uninstall -y $(pip freeze | cut -d'=' -f1) &>/dev/null || true
-pip install --force-reinstall --no-cache-dir -r requirements.txt
+# --- 2. Instalar dependencias -----------------------------------------------
+echo "[INFO] Instalando dependencias..."
+pip install --upgrade pip setuptools wheel -q
+pip install --no-cache-dir -r "$APP_DIR/requirements.txt" -q
 
-# Dev dependencies for non-production
-[ "$ENVIRONMENT" != "production" ] && [ -f "requirements-dev.txt" ] && \
-    pip install --no-cache-dir -r requirements-dev.txt
+# Si estás en desarrollo y tienes dev-requirements
+if [ "${ENVIRONMENT:-production}" != "production" ] && [ -f "$APP_DIR/requirements-dev.txt" ]; then
+    echo "[INFO] Instalando dependencias de desarrollo..."
+    pip install --no-cache-dir -r "$APP_DIR/requirements-dev.txt" -q
+fi
 
-# Run migrations (fail silently)
-[ -d "alembic/versions" ] && [ "$(ls -A alembic/versions 2>/dev/null)" ] && \
-    alembic upgrade head &>/dev/null || echo "⚠️ Migrations skipped"
-
-echo "🚀 Starting app with $WORKERS workers..."
-
-# Start application
-if [ "$ENVIRONMENT" = "production" ]; then
-    exec gunicorn app.main:app \
-        --bind=0.0.0.0:8000 \
-        --workers=$WORKERS \
-        --worker-class=uvicorn.workers.UvicornWorker \
-        --preload \
-        --max-requests=1000 \
-        --timeout=30
+# --- 3. Migraciones CONTROLADAS (solo con tags "migrate-*") ------------------
+if command -v git &>/dev/null && command -v alembic &>/dev/null; then
+    # Obtener el tag exacto del commit actual
+    TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
+    
+    if [[ "$TAG" == migrate-* ]]; then
+        echo "[INFO] 🔄 Tag de migración detectado: $TAG - Ejecutando migraciones..."
+        alembic upgrade head || echo "[WARN] ⚠️ Alembic falló, continuando de todos modos"
+    else
+        echo "[INFO] ⏭️ Sin tag de migración (tag actual: ${TAG:-'ninguno'}) - Omitiendo migraciones"
+    fi
 else
-    exec gunicorn app.main:app \
-        --bind=0.0.0.0:8000 \
-        --workers=$WORKERS \
-        --worker-class=uvicorn.workers.UvicornWorker \
-        --reload
+    echo "[INFO] ⏭️ Git o Alembic no disponible - Omitiendo migraciones"
 fi
+
+# --- 4. Lanzar Gunicorn -----------------------------------------------------
+echo "[INFO] Iniciando aplicación..."
+exec gunicorn app.main:app \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --workers "${WORKERS:-3}" \
+    --bind 0.0.0.0:8000 \
+    --timeout 120
