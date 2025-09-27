@@ -23,10 +23,19 @@ if [ "${ENVIRONMENT:-production}" != "production" ] && [ -f "$APP_DIR/requiremen
     pip install --no-cache-dir -r "$APP_DIR/requirements-dev.txt" -q
 fi
 
-# --- 3. Migraciones (opcional, no debe frenar startup) ----------------------
-if command -v alembic &>/dev/null; then
-    echo "[INFO] Ejecutando migraciones..."
-    alembic upgrade head || echo "[WARN] Alembic falló, continuando de todos modos"
+# --- 3. Migraciones CONTROLADAS (solo con tags "migrate-*") ------------------
+if command -v git &>/dev/null && command -v alembic &>/dev/null; then
+    # Obtener el tag exacto del commit actual
+    TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
+    
+    if [[ "$TAG" == migrate-* ]]; then
+        echo "[INFO] 🔄 Tag de migración detectado: $TAG - Ejecutando migraciones..."
+        alembic upgrade head || echo "[WARN] ⚠️ Alembic falló, continuando de todos modos"
+    else
+        echo "[INFO] ⏭️ Sin tag de migración (tag actual: ${TAG:-'ninguno'}) - Omitiendo migraciones"
+    fi
+else
+    echo "[INFO] ⏭️ Git o Alembic no disponible - Omitiendo migraciones"
 fi
 
 # --- 4. Lanzar Gunicorn -----------------------------------------------------

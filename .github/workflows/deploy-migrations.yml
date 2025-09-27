@@ -1,0 +1,47 @@
+name: Deploy with Migrations
+
+on:
+  push:
+    tags: [ 'migrate-*' ]
+  workflow_dispatch:
+    inputs:
+      force_migrations:
+        description: 'Force run migrations'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  deploy-with-migrations:
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Validate Migration Tag
+      run: |
+        TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
+        echo "🔄 DEPLOY CON MIGRACIONES"
+        echo "📋 Tag detectado: $TAG"
+        echo "📅 Timestamp: $(date)"
+        
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Deploy ONLY for Migrations (No Dependencies Install)
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+        startup-command: 'bash migrate-only.sh'
+        
+    - name: Wait and verify deployment
+      run: |
+        echo "⏳ Esperando deployment con migraciones (90s)..."
+        sleep 90  # Más tiempo para migraciones
+        curl -f https://${{ secrets.AZURE_WEBAPP_NAME }}.azurewebsites.net/health || exit 1
+        echo "✅ Deploy con migraciones completado!"
