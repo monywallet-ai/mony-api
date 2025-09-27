@@ -1,16 +1,38 @@
 #!/bin/bash
-set -e
+set -euxo pipefail   # e: stop on error; u: unset var = error; x: trace; o pipefail: pipeline errors
 
-# Nuclear cleanup & fresh venv
-rm -rf /home/site/wwwroot/.venv /home/site/wwwroot/__pycache__ 2>/dev/null || true
-python -m venv /home/site/wwwroot/.venv
-source /home/site/wwwroot/.venv/bin/activate
+APP_DIR="/home/site/wwwroot"
+VENV_DIR="$APP_DIR/.venv"
 
-# Silent dependency install
-pip install --upgrade pip -q --disable-pip-version-check --no-warn-script-location
-pip install --force-reinstall --no-cache-dir -r requirements.txt -q --no-warn-script-location
-[ "$ENVIRONMENT" != "production" ] && [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt -q --no-warn-script-location
+# --- 1. Virtualenv ----------------------------------------------------------
+if [ ! -d "$VENV_DIR" ]; then
+    echo "[INFO] Creando entorno virtual en $VENV_DIR"
+    python -m venv "$VENV_DIR"
+fi
 
-# Migrations & start
-alembic upgrade head &>/dev/null || true
-exec gunicorn app.main:app --worker-class uvicorn.workers.UvicornWorker --workers ${WORKERS:-3} --bind 0.0.0.0:8000 --timeout 120
+source "$VENV_DIR/bin/activate"
+
+# --- 2. Instalar dependencias -----------------------------------------------
+echo "[INFO] Instalando dependencias..."
+pip install --upgrade pip setuptools wheel -q
+pip install --no-cache-dir -r "$APP_DIR/requirements.txt" -q
+
+# Si estás en desarrollo y tienes dev-requirements
+if [ "${ENVIRONMENT:-production}" != "production" ] && [ -f "$APP_DIR/requirements-dev.txt" ]; then
+    echo "[INFO] Instalando dependencias de desarrollo..."
+    pip install --no-cache-dir -r "$APP_DIR/requirements-dev.txt" -q
+fi
+
+# --- 3. Migraciones (opcional, no debe frenar startup) ----------------------
+if command -v alembic &>/dev/null; then
+    echo "[INFO] Ejecutando migraciones..."
+    alembic upgrade head || echo "[WARN] Alembic falló, continuando de todos modos"
+fi
+
+# --- 4. Lanzar Gunicorn -----------------------------------------------------
+echo "[INFO] Iniciando aplicación..."
+exec gunicorn app.main:app \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --workers "${WORKERS:-3}" \
+    --bind 0.0.0.0:8000 \
+    --timeout 120
