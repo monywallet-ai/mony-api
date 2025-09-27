@@ -11,7 +11,7 @@ from app.schemas.transaction import (
     TransactionUpdate,
     TransactionListResponse,
     TransactionSummary,
-    TransactionType
+    TransactionType,
 )
 from app.models.transaction import TransactionType as ModelTransactionType
 
@@ -23,11 +23,10 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
     response_model=TransactionResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new transaction",
-    description="Create a new financial transaction with all the necessary details."
+    description="Create a new financial transaction with all the necessary details.",
 )
 def create_transaction(
-    transaction: TransactionCreate,
-    db: Session = Depends(get_db)
+    transaction: TransactionCreate, db: Session = Depends(get_db)
 ) -> TransactionResponse:
     """
     Create a new transaction with the following information:
@@ -44,33 +43,36 @@ def create_transaction(
     - **taxes**: Tax amount if applicable (optional)
     - **items**: List of individual items in the transaction (optional)
     """
-    try:
-        return transaction_crud.create(db=db, transaction_data=transaction)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Error creating transaction: {str(e)}"
-        )
+    result = transaction_crud.create(db=db, transaction_data=transaction)
+    return result
 
 
 @router.get(
     "/",
     response_model=TransactionListResponse,
     summary="Get all transactions",
-    description="Retrieve a list of transactions with optional filtering and pagination."
+    description="Retrieve a list of transactions with optional filtering and pagination.",
 )
 def get_transactions(
     skip: int = Query(0, ge=0, description="Number of transactions to skip"),
-    limit: int = Query(20, ge=1, le=100, description="Number of transactions to return"),
-    transaction_type: Optional[TransactionType] = Query(None, description="Filter by transaction type"),
+    limit: int = Query(
+        20, ge=1, le=100, description="Number of transactions to return"
+    ),
+    transaction_type: Optional[TransactionType] = Query(
+        None, description="Filter by transaction type"
+    ),
     category: Optional[str] = Query(None, description="Filter by category"),
     merchant: Optional[str] = Query(None, description="Filter by merchant name"),
-    date_from: Optional[date] = Query(None, description="Start date filter (YYYY-MM-DD)"),
+    date_from: Optional[date] = Query(
+        None, description="Start date filter (YYYY-MM-DD)"
+    ),
     date_to: Optional[date] = Query(None, description="End date filter (YYYY-MM-DD)"),
     currency: Optional[str] = Query(None, description="Filter by currency code"),
-    sort_by: str = Query("date", description="Field to sort by (date, total_amount, merchant, etc.)"),
+    sort_by: str = Query(
+        "date", description="Field to sort by (date, total_amount, merchant, etc.)"
+    ),
     sort_order: str = Query("desc", description="Sort order (asc or desc)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> TransactionListResponse:
     """
     Get a paginated list of transactions with optional filtering:
@@ -95,7 +97,7 @@ def get_transactions(
         date_to=date_to,
         currency=currency,
         sort_by=sort_by,
-        sort_order=sort_order
+        sort_order=sort_order,
     )
 
     # Get total count for pagination info
@@ -108,14 +110,11 @@ def get_transactions(
         merchant=merchant,
         date_from=date_from,
         date_to=date_to,
-        currency=currency
+        currency=currency,
     )
 
     return TransactionListResponse(
-        transactions=transactions,
-        total=len(total_transactions),
-        skip=skip,
-        limit=limit
+        transactions=transactions, total=len(total_transactions), skip=skip, limit=limit
     )
 
 
@@ -123,11 +122,10 @@ def get_transactions(
     "/{transaction_id}",
     response_model=TransactionResponse,
     summary="Get a specific transaction",
-    description="Retrieve a specific transaction by its ID."
+    description="Retrieve a specific transaction by its ID.",
 )
 def get_transaction(
-    transaction_id: int,
-    db: Session = Depends(get_db)
+    transaction_id: int, db: Session = Depends(get_db)
 ) -> TransactionResponse:
     """
     Get a specific transaction by ID.
@@ -137,8 +135,7 @@ def get_transaction(
     transaction = transaction_crud.get(db=db, transaction_id=transaction_id)
     if not transaction:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
         )
     return transaction
 
@@ -147,12 +144,12 @@ def get_transaction(
     "/{transaction_id}",
     response_model=TransactionResponse,
     summary="Update a transaction",
-    description="Update an existing transaction with new information."
+    description="Update an existing transaction with new information.",
 )
 def update_transaction(
     transaction_id: int,
     transaction_update: TransactionUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> TransactionResponse:
     """
     Update an existing transaction.
@@ -167,37 +164,41 @@ def update_transaction(
     existing_transaction = transaction_crud.get(db=db, transaction_id=transaction_id)
     if not existing_transaction:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
         )
 
     # Create a full TransactionCreate object with updated values
     full_data = {
-        "transaction_type": update_data.get("transaction_type", existing_transaction.transaction_type),
+        "transaction_type": update_data.get(
+            "transaction_type", existing_transaction.transaction_type
+        ),
         "merchant": update_data.get("merchant", existing_transaction.merchant),
         "date": update_data.get("date", existing_transaction.date),
-        "total_amount": update_data.get("total_amount", existing_transaction.total_amount),
+        "total_amount": update_data.get(
+            "total_amount", existing_transaction.total_amount
+        ),
         "currency": update_data.get("currency", existing_transaction.currency),
-        "payment_method": update_data.get("payment_method", existing_transaction.payment_method),
+        "payment_method": update_data.get(
+            "payment_method", existing_transaction.payment_method
+        ),
         "category": update_data.get("category", existing_transaction.category),
         "description": update_data.get("description", existing_transaction.description),
-        "reference_number": update_data.get("reference_number", existing_transaction.reference_number),
+        "reference_number": update_data.get(
+            "reference_number", existing_transaction.reference_number
+        ),
         "taxes": update_data.get("taxes", existing_transaction.taxes),
-        "items": update_data.get("items", existing_transaction.items or [])
+        "items": update_data.get("items", existing_transaction.items or []),
     }
 
     transaction_full_update = TransactionCreate(**full_data)
 
     updated_transaction = transaction_crud.update(
-        db=db,
-        transaction_id=transaction_id,
-        transaction_update=transaction_full_update
+        db=db, transaction_id=transaction_id, transaction_update=transaction_full_update
     )
 
     if not updated_transaction:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
         )
 
     return updated_transaction
@@ -207,12 +208,9 @@ def update_transaction(
     "/{transaction_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a transaction",
-    description="Delete a specific transaction by its ID."
+    description="Delete a specific transaction by its ID.",
 )
-def delete_transaction(
-    transaction_id: int,
-    db: Session = Depends(get_db)
-):
+def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
     """
     Delete a transaction permanently.
 
@@ -221,8 +219,7 @@ def delete_transaction(
     success = transaction_crud.delete(db=db, transaction_id=transaction_id)
     if not success:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Transaction not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
         )
 
 
@@ -230,12 +227,12 @@ def delete_transaction(
     "/summary/monthly",
     response_model=TransactionSummary,
     summary="Get monthly transaction summary",
-    description="Get a summary of transactions for a specific month and year."
+    description="Get a summary of transactions for a specific month and year.",
 )
 def get_monthly_summary(
     year: int = Query(..., description="Year (e.g., 2024)"),
     month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> TransactionSummary:
     """
     Get a comprehensive summary of transactions for a specific month:
@@ -252,12 +249,12 @@ def get_monthly_summary(
     "/search/",
     response_model=List[TransactionResponse],
     summary="Search transactions",
-    description="Search transactions by merchant, description, category, or reference number."
+    description="Search transactions by merchant, description, category, or reference number.",
 )
 def search_transactions(
     q: str = Query(..., min_length=2, description="Search term (minimum 2 characters)"),
     limit: int = Query(20, ge=1, le=50, description="Maximum number of results"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> List[TransactionResponse]:
     """
     Search transactions by text across multiple fields:
@@ -275,11 +272,9 @@ def search_transactions(
 @router.get(
     "/stats/by-type",
     summary="Get transaction totals by type",
-    description="Get total amounts for each transaction type."
+    description="Get total amounts for each transaction type.",
 )
-def get_totals_by_type(
-    db: Session = Depends(get_db)
-) -> dict:
+def get_totals_by_type(db: Session = Depends(get_db)) -> dict:
     """
     Get total amounts grouped by transaction type.
 
@@ -287,10 +282,15 @@ def get_totals_by_type(
     """
     totals = {}
     for transaction_type in ModelTransactionType:
-        total = transaction_crud.get_total_by_type(db=db, transaction_type=transaction_type)
+        total = transaction_crud.get_total_by_type(
+            db=db, transaction_type=transaction_type
+        )
         totals[transaction_type.value] = total
 
     return {
         "totals": totals,
-        "net_worth": totals.get("income", 0) - totals.get("expense", 0) + totals.get("saving", 0) + totals.get("investment", 0)
+        "net_worth": totals.get("income", 0)
+        - totals.get("expense", 0)
+        + totals.get("saving", 0)
+        + totals.get("investment", 0),
     }

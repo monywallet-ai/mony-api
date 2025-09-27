@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     2. .env file in project root - SECOND PRIORITY
     3. Default values defined in fields - THIRD PRIORITY
     """
+
     model_config = SettingsConfigDict(
         # First reads from system environment variables
         # Then from .env file if not found in environment
@@ -41,17 +42,50 @@ class Settings(BaseSettings):
     )
     API_VERSION: str = "/api/v1"
     SECRET_KEY: str = os.environ.get("SECRET_KEY", secrets.token_urlsafe(32))
-    CLIENT_HOST: str = os.environ.get("CLIENT_HOST", "http://localhost:5173")
+    FRONTEND_HOST: str = os.environ.get("FRONTEND_HOST", "http://localhost:5173")
     ENVIRONMENT: Literal["local", "dev", "production"] = os.environ.get("ENVIRONMENT", "local")  # type: ignore
     DEBUG: bool = os.environ.get("DEBUG", "true").lower() in ("true", "1", "yes")
     JWT_SECRET_KEY: str = os.environ.get("JWT_SECRET_KEY", "")
     ALGORITHM: str = os.environ.get("ALGORITHM", "HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
+        os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+    )
+
+    # Logging Configuration
+    JSON_LOGS: bool = os.getenv("JSON_LOGS", "false").lower() == "true"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
+    # Auto-enable JSON logs in production
+    if ENVIRONMENT == "production" and not JSON_LOGS:
+        JSON_LOGS = True
+
+    # Optional: Enable/disable specific logging features
+    ENABLE_REQUEST_LOGGING: bool = (
+        os.getenv("ENABLE_REQUEST_LOGGING", "true").lower() == "true"
+    )
+    ENABLE_DATABASE_LOGGING: bool = (
+        os.getenv("ENABLE_DATABASE_LOGGING", "true").lower() == "true"
+    )
+    ENABLE_OPENAI_LOGGING: bool = (
+        os.getenv("ENABLE_OPENAI_LOGGING", "true").lower() == "true"
+    )
+
+    # Request logging exclusions
+    REQUEST_LOG_EXCLUDE_PATHS: list[str] = [
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/favicon.ico",
+        "/health",  # Add health check if you implement it
+    ]
 
     # Docs Authentication
     DOCS_USERNAME: str = os.environ.get("DOCS_USERNAME", "admin")
     DOCS_PASSWORD: str = os.environ.get("DOCS_PASSWORD", "admin")
-    ENABLE_DOCS_AUTH: bool = os.environ.get("ENABLE_DOCS_AUTH", "true" if os.environ.get("ENVIRONMENT") == "production" else "false").lower() in ("true", "1", "yes")
+    ENABLE_DOCS_AUTH: bool = os.environ.get(
+        "ENABLE_DOCS_AUTH",
+        "true" if os.environ.get("ENVIRONMENT") == "production" else "false",
+    ).lower() in ("true", "1", "yes")
 
     CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
 
@@ -59,7 +93,7 @@ class Settings(BaseSettings):
     @property
     def all_cors_origins(self) -> list[str]:
         return [str(origin).rstrip("/") for origin in self.CORS_ORIGINS] + [
-            self.CLIENT_HOST
+            self.FRONTEND_HOST
         ]
 
     PROJECT_NAME: str = os.environ.get("PROJECT_NAME", "Mony API")
@@ -72,7 +106,9 @@ class Settings(BaseSettings):
     OPEN_AI_SECRET_KEY: str = os.environ.get("OPEN_AI_SECRET_KEY", "")
     OPEN_AI_MODEL: str = os.environ.get("OPEN_AI_MODEL", "gpt-4o-mini")
 
-    AZURE_STORAGE_CONNECTION_STRING: str = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", "")
+    AZURE_STORAGE_CONNECTION_STRING: str = os.environ.get(
+        "AZURE_STORAGE_CONNECTION_STRING", ""
+    )
     AZURE_CONTAINER_NAME: str = os.environ.get("AZURE_CONTAINER_NAME", "receipts")
 
     @computed_field  # type: ignore[prop-decorator]
@@ -83,11 +119,15 @@ class Settings(BaseSettings):
         if database_url:
             # Convert to psycopg2 for synchronous operations
             if database_url.startswith("postgresql://"):
-                database_url = database_url.replace("postgresql://", "postgresql+psycopg2://")
+                database_url = database_url.replace(
+                    "postgresql://", "postgresql+psycopg2://"
+                )
             elif database_url.startswith("postgresql+asyncpg://"):
-                database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+                database_url = database_url.replace(
+                    "postgresql+asyncpg://", "postgresql+psycopg2://"
+                )
             return PostgresDsn(database_url)
-        
+
         # If DATABASE_URL doesn't exist, build from individual components
         return PostgresDsn.build(
             scheme="postgresql+psycopg2",  # Use psycopg2 for synchronous operations
@@ -115,7 +155,7 @@ class Settings(BaseSettings):
         if self.ENVIRONMENT == "production":
             self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
             self._check_default_secret("PG_PASSWORD", self.PG_PASSWORD)
-        
+
         return self
 
     def get_config_source_info(self) -> dict[str, str]:
@@ -124,16 +164,22 @@ class Settings(BaseSettings):
         """
         info = {}
         config_fields = [
-            "SECRET_KEY", "ENVIRONMENT", "DEBUG", "DATABASE_URL", 
-            "PG_SERVER", "PG_USER", "PG_DB", "AZURE_STORAGE_CONNECTION_STRING"
+            "SECRET_KEY",
+            "ENVIRONMENT",
+            "DEBUG",
+            "DATABASE_URL",
+            "PG_SERVER",
+            "PG_USER",
+            "PG_DB",
+            "AZURE_STORAGE_CONNECTION_STRING",
         ]
-        
+
         for field in config_fields:
             if field in os.environ:
                 info[field] = "Environment Variable"
             else:
                 info[field] = ".env file or default value"
-                
+
         return info
 
 
