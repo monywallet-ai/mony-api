@@ -11,9 +11,8 @@ from alembic import context
 # Add the app directory to the path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-# Import settings and models
+# Import settings
 from app.settings import settings
-from app.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -24,12 +23,15 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the SQLAlchemy URL from settings
-config.set_main_option("sqlalchemy.url", str(settings.SQLALCHEMY_DATABASE_URI))
+# Set the SQLAlchemy URL from settings (now using psycopg2)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-target_metadata = Base.metadata
+# TODO: Import models when they are created
+# from app.models import Base
+# target_metadata = Base.metadata
+target_metadata = None
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

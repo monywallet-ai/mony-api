@@ -44,8 +44,8 @@ fi
 
 # Ejecutar migraciones de base de datos
 echo "Running database migrations..."
-echo "Skipping database migrations - no models defined yet..."
-# alembic upgrade head
+# echo "Skipping database migrations - no models defined yet..."
+alembic upgrade head
 
 # Start the application
 echo "Starting application with gunicorn using $WORKERS worker(s)..."
