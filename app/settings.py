@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     API_VERSION: str = "/api/v1"
     SECRET_KEY: str = os.environ.get("SECRET_KEY", secrets.token_urlsafe(32))
     CLIENT_HOST: str = os.environ.get("CLIENT_HOST", "http://localhost:5173")
-    ENVIRONMENT: Literal["local", "development", "production"] = os.environ.get("ENVIRONMENT", "local")  # type: ignore
+    ENVIRONMENT: Literal["local", "dev", "production"] = os.environ.get("ENVIRONMENT", "local")  # type: ignore
     DEBUG: bool = os.environ.get("DEBUG", "true").lower() in ("true", "1", "yes")
     JWT_SECRET_KEY: str = os.environ.get("JWT_SECRET_KEY", "")
     ALGORITHM: str = os.environ.get("ALGORITHM", "HS256")
