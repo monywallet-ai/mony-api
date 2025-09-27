@@ -42,7 +42,7 @@ def authenticate_docs(
             detail="Incorrect documentation credentials",
             headers={"WWW-Authenticate": "Basic"},
         )
-    
+
     return True
 
 

@@ -1,9 +1,6 @@
 # Build stage
 FROM python:3.12-alpine AS builder
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 # Install build dependencies
 RUN apk add --no-cache \
     gcc \
@@ -14,14 +11,19 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Set uv environment variables
-ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+# Create virtual environment
+RUN python -m venv /app/venv
+
+# Activate virtual environment
+ENV PATH="/app/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --upgrade pip
 
 # Install dependencies
-COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev
+COPY requirements.txt ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-deps -r requirements.txt
 
 # Production stage
 FROM python:3.12-alpine AS production
@@ -38,28 +40,23 @@ RUN addgroup -g 1001 -S appgroup && \
 
 WORKDIR /app
 
-# Copy uv from builder
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 # Copy virtual environment from builder with correct ownership
-COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
+COPY --from=builder --chown=appuser:appgroup /app/venv /app/venv
 
 # Set environment variables
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/app/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_COMPILE_BYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1
 
 # Copy application code
 COPY --chown=appuser:appgroup . .
 
-# Switch to non-root user before installing project
+# Switch to non-root user
 USER appuser
 
-# Install the project itself and make startup script executable
-RUN uv sync --frozen --no-dev && \
-    chmod +x startup.sh
+# Make startup script executable
+RUN chmod +x startup.sh
 
 EXPOSE 8000
 
-CMD ["uv", "run", "gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "app.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
