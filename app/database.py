@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.settings import settings
+from app.core.settings import settings
 from app.core.logging import database_logger
 
 # Create the database engine
@@ -16,9 +16,7 @@ def get_db():
         yield db
     except Exception as e:
         database_logger.error(
-            "database_session_error",
-            error=str(e),
-            error_type=type(e).__name__
+            "database_session_error", error=str(e), error_type=type(e).__name__
         )
         raise
     finally:

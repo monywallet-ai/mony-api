@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from openai import OpenAI
 
-from app.settings import settings
+from app.core.settings import settings
 from app.schemas.receipt import ReceiptAnalysisResponse, ErrorResponse
 from app.core.logging import receipt_logger
 from app.core.log_utils import log_openai_request

@@ -8,8 +8,8 @@ from fastapi.openapi.utils import get_openapi
 from app.api.main import api_router
 from app.core.logging import general_logger, setup_logging
 from app.core.middleware import RequestLoggingMiddleware
-from app.settings import settings
-from app.auth import get_docs_auth_dependency
+from app.core.settings import settings
+from app.core.auth import get_docs_auth_dependency
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
