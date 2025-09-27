@@ -24,12 +24,16 @@ app = FastAPI(
 
 @app.get("/health")
 async def health_check():
+    import os
+    import sys
     return {
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
         "version": settings.API_VERSION.lstrip("/"),
         "project": settings.PROJECT_NAME,
-        "debug": settings.DEBUG
+        "debug": settings.DEBUG,
+        "workers": os.environ.get("WORKERS", "auto-detected"),
+        "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     }
 
 @app.get("/debug/config-sources")
