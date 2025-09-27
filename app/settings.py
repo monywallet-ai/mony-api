@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = os.environ.get("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
+    # Docs Authentication
+    DOCS_USERNAME: str = os.environ.get("DOCS_USERNAME", "admin")
+    DOCS_PASSWORD: str = os.environ.get("DOCS_PASSWORD", "admin")
+    ENABLE_DOCS_AUTH: bool = os.environ.get("ENABLE_DOCS_AUTH", "true" if os.environ.get("ENVIRONMENT") == "production" else "false").lower() in ("true", "1", "yes")
+
     CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
 
     @computed_field  # type: ignore[prop-decorator]
