@@ -31,6 +31,15 @@ def test_imports():
         print(f"❌ psycopg2 test failed: {e}")
         return False
     
+    try:
+        from websockets.datastructures import Headers
+        import websockets
+        print(f"✅ websockets {websockets.__version__}")
+        print(f"✅ websockets.datastructures is available")
+    except Exception as e:
+        print(f"❌ websockets test failed: {e}")
+        return False
+    
     return True
 
 def test_settings():

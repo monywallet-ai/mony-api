@@ -29,6 +29,7 @@ def main():
         ("sqlalchemy", "sqlalchemy"),
         ("alembic", "alembic"),
         ("psycopg2", "psycopg2-binary"),
+        ("websockets", "websockets"),
         ("pydantic", "pydantic"),
         ("pydantic_settings", "pydantic-settings"),
     ]
