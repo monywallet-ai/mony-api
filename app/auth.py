@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-from .settings import get_settings
+from .settings import settings
 
 security = HTTPBasic()
 
@@ -19,7 +19,6 @@ def authenticate_docs(
     Authenticate users for API documentation access.
     Uses HTTP Basic Authentication with configurable credentials.
     """
-    settings = get_settings()
     
     # If docs authentication is disabled, allow access
     if not settings.ENABLE_DOCS_AUTH:
@@ -52,5 +51,4 @@ def get_docs_auth_dependency():
     Get the authentication dependency for docs.
     Returns None if authentication is disabled.
     """
-    settings = get_settings()
     return authenticate_docs if settings.ENABLE_DOCS_AUTH else None
