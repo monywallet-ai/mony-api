@@ -5,6 +5,7 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-decouple==3.8
 asyncpg==0.29.0
+psycopg2-binary==2.9.9
 alembic==1.16.5
 openai>=1.109.1
 pydantic-settings>=2.11.0

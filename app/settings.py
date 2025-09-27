@@ -81,14 +81,16 @@ class Settings(BaseSettings):
         # First try to use complete DATABASE_URL (as Azure Web App provides it)
         database_url = os.environ.get("DATABASE_URL")
         if database_url:
-            # Convert to asyncpg if necessary
+            # Convert to psycopg2 for synchronous operations
             if database_url.startswith("postgresql://"):
-                database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
+                database_url = database_url.replace("postgresql://", "postgresql+psycopg2://")
+            elif database_url.startswith("postgresql+asyncpg://"):
+                database_url = database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
             return PostgresDsn(database_url)
         
         # If DATABASE_URL doesn't exist, build from individual components
         return PostgresDsn.build(
-            scheme="postgresql+asyncpg",  # Changed to use asyncpg
+            scheme="postgresql+psycopg2",  # Use psycopg2 for synchronous operations
             username=self.PG_USER,
             password=self.PG_PASSWORD,
             host=self.PG_SERVER,
