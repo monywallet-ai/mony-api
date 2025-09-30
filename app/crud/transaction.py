@@ -4,6 +4,8 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc
 
+from app.core.log_utils import log_database_operation
+from app.core.logging import database_logger
 from app.models.transaction import Transaction, TransactionType
 from app.schemas.transaction import TransactionCreate, TransactionResponse
 
@@ -30,6 +32,7 @@ def _process_items_for_jsonb(items: List) -> List:
 
 
 class TransactionCRUD:
+    @log_database_operation("create")
     def create(self, db: Session, transaction_data: TransactionCreate) -> Transaction:
         # Convert Pydantic model to dict and handle items serialization
         transaction_dict = transaction_data.model_dump()
@@ -46,9 +49,11 @@ class TransactionCRUD:
         db.refresh(db_transaction)
         return db_transaction
 
+    @log_database_operation("read")
     def get(self, db: Session, transaction_id: int) -> Optional[Transaction]:
         return db.query(Transaction).filter(Transaction.id == transaction_id).first()
 
+    @log_database_operation("read")
     def get_multi(
         self,
         db: Session,
@@ -97,6 +102,7 @@ class TransactionCRUD:
 
         return query.offset(skip).limit(limit).all()
 
+    @log_database_operation("update")
     def update(
         self, db: Session, transaction_id: int, transaction_update
     ) -> Optional[Transaction]:
@@ -119,6 +125,7 @@ class TransactionCRUD:
         db.refresh(db_transaction)
         return db_transaction
 
+    @log_database_operation("delete")
     def delete(self, db: Session, transaction_id: int) -> bool:
         db_transaction = self.get(db, transaction_id)
         if not db_transaction:
@@ -128,6 +135,7 @@ class TransactionCRUD:
         db.commit()
         return True
 
+    @log_database_operation("read")
     def get_total_by_type(
         self, db: Session, transaction_type: TransactionType
     ) -> Decimal:
@@ -138,6 +146,7 @@ class TransactionCRUD:
         )
         return sum(amount[0] for amount in result) if result else Decimal("0.0")
 
+    @log_database_operation("read")
     def get_monthly_summary(self, db: Session, year: int, month: int) -> dict:
         from sqlalchemy import extract, func
 
@@ -183,6 +192,7 @@ class TransactionCRUD:
 
         return summary
 
+    @log_database_operation("read")
     def search(
         self, db: Session, search_term: str, limit: int = 20
     ) -> List[Transaction]:
