@@ -111,6 +111,24 @@ class Settings(BaseSettings):
     )
     AZURE_CONTAINER_NAME: str = os.environ.get("AZURE_CONTAINER_NAME", "receipts")
 
+    # Redis Configuration for Rate Limiting
+    REDIS_HOST: str = os.environ.get("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.environ.get("REDIS_PORT", "6379"))
+    REDIS_PASSWORD: str = os.environ.get("REDIS_PASSWORD", "")
+    REDIS_DB: int = int(os.environ.get("REDIS_DB", "0"))
+    REDIS_URL: str = os.environ.get("REDIS_URL", "")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def redis_url(self) -> str:
+        """Build Redis URL from components or use provided URL"""
+        if self.REDIS_URL:
+            return self.REDIS_URL
+
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
