@@ -6,7 +6,7 @@ from fastapi import APIRouter, File, UploadFile, status, Depends
 from openai import OpenAI
 
 from app.core.settings import settings
-from app.schemas.receipt import ReceiptAnalysisResponse, ErrorResponse
+from app.schemas.receipt import ReceiptAnalysisResponse, ErrorResponse, receipt_responses
 from app.core.logging import receipt_logger
 from app.core.log_utils import log_openai_request
 from app.core.rate_limiter import receipt_rate_limit
@@ -168,21 +168,7 @@ async def call_openai_for_receipt_analysis(base64_image: str, filename: str):
     status_code=status.HTTP_200_OK,
     summary="Analyze receipt image",
     description="Upload a receipt image and extract structured data using AI analysis.",
-    responses={
-        400: {
-            "model": ErrorResponse,
-            "description": "Bad request - invalid file or format",
-        },
-        413: {"model": ErrorResponse, "description": "File too large"},
-        422: {
-            "model": ErrorResponse,
-            "description": "Unprocessable entity - unsupported file type",
-        },
-        500: {
-            "model": ErrorResponse,
-            "description": "Internal server error - AI analysis failed",
-        },
-    },
+    responses=receipt_responses["analyze_receipt"],
 )
 async def analyze_receipt(
     receipt: UploadFile = File(

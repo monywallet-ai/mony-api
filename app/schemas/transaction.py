@@ -4,6 +4,13 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 
+from .error import (
+    ValidationErrorResponse,
+    NotFoundErrorResponse,
+    RateLimitErrorResponse,
+    InternalServerErrorResponse
+)
+
 
 class TransactionType(str, Enum):
     expense = "expense"
@@ -206,3 +213,245 @@ class TransactionFilters(BaseModel):
             }
         }
     )
+
+
+# Swagger Response Documentation
+transaction_responses = {
+    "create_transaction": {
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "invalid_amount": {
+                            "summary": "Invalid transaction amount",
+                            "value": {
+                                "success": False,
+                                "error_code": "VALIDATION_ERROR",
+                                "message": "Transaction amount must be greater than 0",
+                                "details": {
+                                    "field": "total_amount",
+                                    "value": -50.0
+                                },
+                                "timestamp": "2024-10-01T12:00:00Z",
+                                "request_id": "req_abc123"
+                            }
+                        },
+                        "empty_merchant": {
+                            "summary": "Empty merchant name",
+                            "value": {
+                                "success": False,
+                                "error_code": "VALIDATION_ERROR",
+                                "message": "Merchant name is required",
+                                "details": {
+                                    "field": "merchant",
+                                    "value": ""
+                                },
+                                "timestamp": "2024-10-01T12:00:00Z",
+                                "request_id": "req_abc123"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "RATE_LIMIT_EXCEEDED",
+                        "message": "Too many requests. Limit: 50 per 60 seconds",
+                        "limit": 50,
+                        "window": "60 seconds",
+                        "retry_after": 45,
+                        "timestamp": "2024-10-01T12:00:00Z",
+                        "request_id": "req_abc123"
+                    }
+                }
+            }
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "DATABASE_ERROR",
+                        "message": "Failed to create transaction",
+                        "details": {
+                            "operation": "create"
+                        },
+                        "timestamp": "2024-10-01T12:00:00Z",
+                        "request_id": "req_abc123"
+                    }
+                }
+            }
+        }
+    },
+
+    "get_transactions": {
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded"
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error"
+        }
+    },
+
+    "get_transaction": {
+        404: {
+            "model": NotFoundErrorResponse,
+            "description": "Transaction not found",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "RESOURCE_NOT_FOUND",
+                        "message": "Transaction with ID 999 not found",
+                        "details": {
+                            "resource": "Transaction",
+                            "resource_id": "999"
+                        },
+                        "timestamp": "2024-10-01T12:00:00Z",
+                        "request_id": "req_abc123"
+                    }
+                }
+            }
+        },
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded"
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error"
+        }
+    },
+
+    "update_transaction": {
+        404: {
+            "model": NotFoundErrorResponse,
+            "description": "Transaction not found"
+        },
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "VALIDATION_ERROR",
+                        "message": "Transaction amount must be greater than 0",
+                        "details": {
+                            "field": "total_amount",
+                            "value": -25.0
+                        },
+                        "timestamp": "2024-10-01T12:00:00Z",
+                        "request_id": "req_abc123"
+                    }
+                }
+            }
+        },
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded"
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error"
+        }
+    },
+
+    "delete_transaction": {
+        404: {
+            "model": NotFoundErrorResponse,
+            "description": "Transaction not found"
+        },
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded"
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error"
+        }
+    },
+
+    "get_monthly_summary": {
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "VALIDATION_ERROR",
+                        "message": "Month must be between 1 and 12",
+                        "details": {
+                            "field": "month",
+                            "value": 13
+                        },
+                        "timestamp": "2024-10-01T12:00:00Z",
+                        "request_id": "req_abc123"
+                    }
+                }
+            }
+        },
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded"
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error"
+        }
+    },
+
+    "search_transactions": {
+        422: {
+            "model": ValidationErrorResponse,
+            "description": "Validation error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error_code": "VALIDATION_ERROR",
+                        "message": "Search term must be at least 2 characters long",
+                        "details": {
+                            "field": "search_term",
+                            "value": "a"
+                        },
+                        "timestamp": "2024-10-01T12:00:00Z",
+                        "request_id": "req_abc123"
+                    }
+                }
+            }
+        },
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded"
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error"
+        }
+    },
+
+    "get_totals_by_type": {
+        429: {
+            "model": RateLimitErrorResponse,
+            "description": "Rate limit exceeded"
+        },
+        500: {
+            "model": InternalServerErrorResponse,
+            "description": "Internal server error"
+        }
+    }
+}

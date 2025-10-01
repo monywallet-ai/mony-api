@@ -14,6 +14,7 @@ from app.schemas.transaction import (
     TransactionListResponse,
     TransactionSummary,
     TransactionType,
+    transaction_responses,
 )
 from app.models.transaction import TransactionType as ModelTransactionType
 from app.core.exceptions import ResourceNotFoundException
@@ -33,6 +34,7 @@ def get_transaction_service(db: Session) -> TransactionService:
     status_code=status.HTTP_201_CREATED,
     summary="Create a new transaction",
     description="Create a new financial transaction with all the necessary details.",
+    responses=transaction_responses["create_transaction"],
 )
 def create_transaction(
     transaction: TransactionCreate,
@@ -64,6 +66,7 @@ def create_transaction(
     response_model=TransactionListResponse,
     summary="Get all transactions",
     description="Retrieve a list of transactions with optional filtering and pagination.",
+    responses=transaction_responses["get_transactions"],
 )
 def get_transactions(
     skip: int = Query(0, ge=0, description="Number of transactions to skip"),
@@ -121,6 +124,7 @@ def get_transactions(
     response_model=TransactionResponse,
     summary="Get a specific transaction",
     description="Retrieve a specific transaction by its ID.",
+    responses=transaction_responses["get_transaction"],
 )
 def get_transaction(
     transaction_id: int,
@@ -147,6 +151,7 @@ def get_transaction(
     response_model=TransactionResponse,
     summary="Update a transaction",
     description="Update an existing transaction with new information.",
+    responses=transaction_responses["update_transaction"],
 )
 def update_transaction(
     transaction_id: int,
@@ -176,6 +181,7 @@ def update_transaction(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a transaction",
     description="Delete a specific transaction by its ID.",
+    responses=transaction_responses["delete_transaction"],
 )
 def delete_transaction(
     transaction_id: int,
@@ -201,6 +207,7 @@ def delete_transaction(
     response_model=TransactionSummary,
     summary="Get monthly transaction summary",
     description="Get a summary of transactions for a specific month and year.",
+    responses=transaction_responses["get_monthly_summary"],
 )
 def get_monthly_summary(
     year: int = Query(..., description="Year (e.g., 2024)"),
@@ -225,6 +232,7 @@ def get_monthly_summary(
     response_model=List[TransactionResponse],
     summary="Search transactions",
     description="Search transactions by merchant, description, category, or reference number.",
+    responses=transaction_responses["search_transactions"],
 )
 def search_transactions(
     q: str = Query(..., min_length=2, description="Search term (minimum 2 characters)"),
@@ -250,6 +258,7 @@ def search_transactions(
     "/stats/by-type",
     summary="Get transaction totals by type",
     description="Get total amounts for each transaction type.",
+    responses=transaction_responses["get_totals_by_type"],
 )
 def get_totals_by_type(
     db: Session = Depends(get_db),
