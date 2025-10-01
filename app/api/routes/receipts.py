@@ -2,14 +2,15 @@ import mimetypes
 import base64
 import json
 from typing import List
-from fastapi import APIRouter, File, HTTPException, UploadFile, status, Depends
+from fastapi import APIRouter, File, UploadFile, status, Depends
 from openai import OpenAI
 
 from app.core.settings import settings
-from app.schemas.receipt import ReceiptAnalysisResponse, ErrorResponse
+from app.schemas.receipt import ReceiptAnalysisResponse, ErrorResponse, receipt_responses
 from app.core.logging import receipt_logger
 from app.core.log_utils import log_openai_request
 from app.core.rate_limiter import receipt_rate_limit
+from app.core.exceptions import FileProcessingException
 
 router = APIRouter(prefix="/receipts", tags=["Receipts"])
 
@@ -167,21 +168,7 @@ async def call_openai_for_receipt_analysis(base64_image: str, filename: str):
     status_code=status.HTTP_200_OK,
     summary="Analyze receipt image",
     description="Upload a receipt image and extract structured data using AI analysis.",
-    responses={
-        400: {
-            "model": ErrorResponse,
-            "description": "Bad request - invalid file or format",
-        },
-        413: {"model": ErrorResponse, "description": "File too large"},
-        422: {
-            "model": ErrorResponse,
-            "description": "Unprocessable entity - unsupported file type",
-        },
-        500: {
-            "model": ErrorResponse,
-            "description": "Internal server error - AI analysis failed",
-        },
-    },
+    responses=receipt_responses["analyze_receipt"],
 )
 async def analyze_receipt(
     receipt: UploadFile = File(
@@ -214,21 +201,33 @@ async def analyze_receipt(
     """
     if not receipt.filename or receipt.filename == "":
         receipt_logger.error("receipt_analysis_failed", error="No file provided")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="No file provided"
+        raise FileProcessingException(
+            message="No file provided",
+            filename=None,
+            error_type="MISSING_FILE"
         )
 
     file_type, _ = mimetypes.guess_type(receipt.filename)
     if not file_type or file_type not in ALLOWED_FILE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_FILE_TYPES)}",
+        raise FileProcessingException(
+            message=f"Invalid file type. Allowed types: {', '.join(ALLOWED_FILE_TYPES)}",
+            filename=receipt.filename,
+            file_type=file_type,
+            error_type="UNSUPPORTED_FORMAT",
+            details={"supported_formats": ALLOWED_FILE_TYPES}
         )
 
     if receipt.size and receipt.size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size allowed: {MAX_FILE_SIZE // (1024 * 1024)}MB",
+        raise FileProcessingException(
+            message=f"File too large. Maximum size allowed: {MAX_FILE_SIZE // (1024 * 1024)}MB",
+            filename=receipt.filename,
+            file_type=file_type,
+            error_type="FILE_TOO_LARGE",
+            details={
+                "file_size": receipt.size,
+                "max_size": MAX_FILE_SIZE,
+                "max_size_mb": MAX_FILE_SIZE // (1024 * 1024)
+            }
         )
 
     file_content = await receipt.read()
@@ -239,9 +238,12 @@ async def analyze_receipt(
             base64_image, receipt.filename
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"AI analysis failed: {str(e)}",
+        raise FileProcessingException(
+            message=f"AI analysis failed: {str(e)}",
+            filename=receipt.filename,
+            file_type=file_type,
+            error_type="AI_PROCESSING_FAILED",
+            details={"original_error": str(e)}
         )
 
     if not response.choices or not response.choices[0].message.content:
@@ -250,9 +252,12 @@ async def analyze_receipt(
             error="Empty AI response",
             filename=receipt.filename,
         )
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Could not extract receipt data from the provided image",
+        raise FileProcessingException(
+            message="Could not extract receipt data from the provided image",
+            filename=receipt.filename,
+            file_type=file_type,
+            error_type="EXTRACTION_FAILED",
+            details={"reason": "Empty AI response"}
         )
 
     try:
@@ -264,9 +269,12 @@ async def analyze_receipt(
             filename=receipt.filename,
             parse_error=str(e),
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to parse AI response: {str(e)}",
+        raise FileProcessingException(
+            message=f"Failed to parse AI response: {str(e)}",
+            filename=receipt.filename,
+            file_type=file_type,
+            error_type="RESPONSE_PARSING_FAILED",
+            details={"parse_error": str(e), "ai_response": response.choices[0].message.content[:200]}
         )
 
     return ReceiptAnalysisResponse(receipt=receipt_data)

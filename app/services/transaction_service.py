@@ -10,6 +10,11 @@ from app.schemas.transaction import (
     TransactionListResponse,
 )
 from app.core.logging import general_logger
+from app.core.exceptions import (
+    ValidationException,
+    BusinessLogicException,
+    DatabaseException,
+)
 
 
 class TransactionService:
@@ -58,13 +63,23 @@ class TransactionService:
 
             return transaction
 
+        except DatabaseException:
+            raise
+        except ValidationException:
+            raise
+        except BusinessLogicException:
+            raise
         except Exception as e:
             general_logger.error(
                 "transaction_creation_failed",
                 error=str(e),
                 merchant=transaction_data.merchant if transaction_data else None,
             )
-            raise
+            raise DatabaseException(
+                message="Failed to create transaction",
+                operation="create",
+                details={"original_error": str(e)},
+            )
 
     def get_transaction_by_id(self, transaction_id: int) -> Optional[Transaction]:
         """
@@ -87,7 +102,11 @@ class TransactionService:
                 transaction_id=transaction_id,
                 error=str(e),
             )
-            raise
+            raise DatabaseException(
+                message="Failed to retrieve transaction",
+                operation="read",
+                details={"transaction_id": transaction_id, "original_error": str(e)},
+            )
 
     def get_transactions_paginated(
         self,
@@ -246,7 +265,11 @@ class TransactionService:
         try:
             # Validate search term
             if not search_term or len(search_term.strip()) < 2:
-                raise ValueError("Search term must be at least 2 characters long")
+                raise ValidationException(
+                    message="Search term must be at least 2 characters long",
+                    field="search_term",
+                    value=search_term,
+                )
 
             transactions = self.transaction_repo.search_transactions(
                 search_term.strip(), limit
@@ -274,7 +297,9 @@ class TransactionService:
         try:
             # Validate parameters
             if month < 1 or month > 12:
-                raise ValueError("Month must be between 1 and 12")
+                raise ValidationException(
+                    message="Month must be between 1 and 12", field="month", value=month
+                )
 
             summary = self.transaction_repo.get_monthly_summary(year, month)
 
@@ -355,10 +380,11 @@ class TransactionService:
 
         # Validate merchant name
         if not transaction_data.merchant or len(transaction_data.merchant.strip()) < 1:
-            raise ValueError("Merchant name is required")
-
-        # Add more business rule validations as needed
-        # Example: Check for duplicate transactions, validate currency, etc.
+            raise ValidationException(
+                message="Merchant name is required",
+                field="merchant",
+                value=transaction_data.merchant,
+            )
 
     def _validate_amount(self, amount: Decimal) -> None:
         """
@@ -371,13 +397,16 @@ class TransactionService:
             ValueError: If amount is invalid
         """
         if amount <= 0:
-            raise ValueError("Transaction amount must be greater than 0")
-
-        if amount > Decimal("1000000"):  # 1 million limit
-            raise ValueError("Transaction amount exceeds maximum allowed limit")
+            raise ValidationException(
+                message="Transaction amount must be greater than 0",
+                field="total_amount",
+                value=float(amount),
+            )
 
         # Check decimal places (should be 2 for currency)
         if amount.as_tuple().exponent < -2:
-            raise ValueError(
-                "Transaction amount cannot have more than 2 decimal places"
+            raise ValidationException(
+                message="Transaction amount cannot have more than 2 decimal places",
+                field="total_amount",
+                value=float(amount),
             )
