@@ -17,6 +17,7 @@ from app.core.redis_client import (
 )
 from app.core.rate_limiter import RateLimitHeadersMiddleware
 from app.database import health_check_database
+from app.core.error_handlers import register_exception_handlers
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -104,6 +105,7 @@ app_config["lifespan"] = lifespan
 
 app = FastAPI(**app_config)
 
+register_exception_handlers(app)
 
 # Custom authenticated documentation endpoints
 if settings.ENABLE_DOCS_AUTH:

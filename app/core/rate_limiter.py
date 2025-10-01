@@ -1,6 +1,7 @@
 import time
 from typing import Dict, Any
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
+from app.core.exceptions import RateLimitException
 from slowapi.util import get_remote_address
 from redis.asyncio import Redis
 
@@ -156,14 +157,15 @@ async def rate_limit_dependency(
             **request.state.rate_limit_headers,
         }
 
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "error": "Rate limit exceeded",
-                "message": f"Too many requests. Limit: {limit} per {window} seconds",
-                "retry_after": rate_info["retry_after"],
-            },
-            headers=headers,
+        raise RateLimitException(
+            message=f"Too many requests. Limit: {limit} per {window} seconds",
+            limit=limit,
+            window=f"{window} seconds",
+            retry_after=rate_info["retry_after"],
+            details={
+                "current_requests": rate_info["current"],
+                "window_start": rate_info["reset"] - window
+            }
         )
 
 

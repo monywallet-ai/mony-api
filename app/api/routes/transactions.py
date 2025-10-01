@@ -16,6 +16,7 @@ from app.schemas.transaction import (
     TransactionType,
 )
 from app.models.transaction import TransactionType as ModelTransactionType
+from app.core.exceptions import ResourceNotFoundException
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
@@ -134,8 +135,9 @@ def get_transaction(
     service = get_transaction_service(db)
     transaction = service.get_transaction_by_id(transaction_id)
     if not transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
+        raise ResourceNotFoundException(
+            resource="Transaction",
+            resource_id=transaction_id
         )
     return transaction
 
@@ -161,8 +163,9 @@ def update_transaction(
     updated_transaction = service.update_transaction(transaction_id, transaction_update)
 
     if not updated_transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
+        raise ResourceNotFoundException(
+            resource="Transaction",
+            resource_id=transaction_id
         )
 
     return updated_transaction
@@ -187,8 +190,9 @@ def delete_transaction(
     service = get_transaction_service(db)
     success = service.delete_transaction(transaction_id)
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
+        raise ResourceNotFoundException(
+            resource="Transaction",
+            resource_id=transaction_id
         )
 
 
