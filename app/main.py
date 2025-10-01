@@ -10,6 +10,13 @@ from app.core.logging import general_logger, setup_logging
 from app.core.middleware import RequestLoggingMiddleware
 from app.core.settings import settings
 from app.core.auth import get_docs_auth_dependency
+from app.core.redis_client import (
+    get_redis_client,
+    close_redis_client,
+    health_check_redis,
+)
+from app.core.rate_limiter import RateLimitHeadersMiddleware
+from app.database import health_check_database
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -75,14 +82,22 @@ async def lifespan(app: FastAPI):
     # Add startup tasks here
     # e.g., database connections, cache initialization, etc.
 
+    # Initialize Redis connection for rate limiting
+    try:
+        await get_redis_client()
+        general_logger.info("redis_initialized")
+    except Exception as e:
+        general_logger.error("redis_initialization_failed", error=str(e))
+
     try:
         yield
     finally:
-        # Shutdown
         general_logger.info("application_shutting_down")
-
-        # Add shutdown tasks here
-        # e.g., close database connections, cleanup resources, etc.
+        try:
+            await close_redis_client()
+            general_logger.info("redis_connection_closed")
+        except Exception as e:
+            general_logger.error("redis_cleanup_failed", error=str(e))
 
 
 app_config["lifespan"] = lifespan
@@ -124,8 +139,13 @@ async def health_check():
     import os
     import sys
 
+    redis_healthy = await health_check_redis()
+    database_healthy = health_check_database()
+
+    overall_status = "healthy" if (redis_healthy and database_healthy) else "degraded"
+
     return {
-        "status": "healthy",
+        "status": overall_status,
         "environment": settings.ENVIRONMENT,
         "version": settings.API_VERSION.lstrip("/"),
         "project": settings.PROJECT_NAME,
@@ -133,6 +153,10 @@ async def health_check():
         "workers": os.environ.get("WORKERS", "auto-detected"),
         "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "docs_auth_enabled": settings.ENABLE_DOCS_AUTH,
+        "services": {
+            "database": "healthy" if database_healthy else "unhealthy",
+            "redis": "healthy" if redis_healthy else "unhealthy",
+        },
         "docs_endpoints": {
             "swagger": (
                 "/docs"
@@ -245,5 +269,8 @@ if settings.ENABLE_REQUEST_LOGGING:
     app.add_middleware(
         RequestLoggingMiddleware, exclude_paths=settings.REQUEST_LOG_EXCLUDE_PATHS
     )
+
+# Add rate limiting headers middleware
+app.add_middleware(RateLimitHeadersMiddleware)
 
 app.include_router(api_router, prefix=settings.API_VERSION)

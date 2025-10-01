@@ -13,3 +13,5 @@ openai>=1.109.1
 pydantic-settings>=2.11.0
 python-json-logger==3.3.0
 structlog==25.4.0
+redis==6.4.0
+slowapi>=0.1.9
