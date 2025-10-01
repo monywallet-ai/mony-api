@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.crud.transaction import transaction_crud
 from app.core.rate_limiter import general_rate_limit
+from app.services.transaction_service import TransactionService
+from app.repositories.transaction_repository import TransactionRepository
 from app.schemas.transaction import (
     TransactionCreate,
     TransactionResponse,
@@ -17,6 +18,12 @@ from app.schemas.transaction import (
 from app.models.transaction import TransactionType as ModelTransactionType
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
+
+
+def get_transaction_service(db: Session) -> TransactionService:
+    """Get transaction service with repository."""
+    repository = TransactionRepository(db)
+    return TransactionService(repository)
 
 
 @router.post(
@@ -46,7 +53,8 @@ def create_transaction(
     - **taxes**: Tax amount if applicable (optional)
     - **items**: List of individual items in the transaction (optional)
     """
-    result = transaction_crud.create(db=db, transaction_data=transaction)
+    service = get_transaction_service(db)
+    result = service.create_transaction(transaction)
     return result
 
 
@@ -90,8 +98,8 @@ def get_transactions(
     if transaction_type:
         model_transaction_type = ModelTransactionType(transaction_type.value)
 
-    transactions = transaction_crud.get_multi(
-        db=db,
+    service = get_transaction_service(db)
+    response = service.get_transactions_paginated(
         skip=skip,
         limit=limit,
         transaction_type=model_transaction_type,
@@ -104,22 +112,7 @@ def get_transactions(
         sort_order=sort_order,
     )
 
-    # Get total count for pagination info
-    total_transactions = transaction_crud.get_multi(
-        db=db,
-        skip=0,
-        limit=1000000,  # Large number to get all for counting
-        transaction_type=model_transaction_type,
-        category=category,
-        merchant=merchant,
-        date_from=date_from,
-        date_to=date_to,
-        currency=currency,
-    )
-
-    return TransactionListResponse(
-        transactions=transactions, total=len(total_transactions), skip=skip, limit=limit
-    )
+    return response
 
 
 @router.get(
@@ -138,7 +131,8 @@ def get_transaction(
 
     Returns detailed information about the transaction including all items.
     """
-    transaction = transaction_crud.get(db=db, transaction_id=transaction_id)
+    service = get_transaction_service(db)
+    transaction = service.get_transaction_by_id(transaction_id)
     if not transaction:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
@@ -163,45 +157,8 @@ def update_transaction(
 
     You can update any field of the transaction. Only provided fields will be updated.
     """
-    # Convert TransactionUpdate to TransactionCreate for the CRUD operation
-    # This is a workaround since our CRUD expects TransactionCreate
-    update_data = transaction_update.model_dump(exclude_unset=True)
-
-    # Get the existing transaction to fill in missing fields
-    existing_transaction = transaction_crud.get(db=db, transaction_id=transaction_id)
-    if not existing_transaction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
-        )
-
-    # Create a full TransactionCreate object with updated values
-    full_data = {
-        "transaction_type": update_data.get(
-            "transaction_type", existing_transaction.transaction_type
-        ),
-        "merchant": update_data.get("merchant", existing_transaction.merchant),
-        "date": update_data.get("date", existing_transaction.date),
-        "total_amount": update_data.get(
-            "total_amount", existing_transaction.total_amount
-        ),
-        "currency": update_data.get("currency", existing_transaction.currency),
-        "payment_method": update_data.get(
-            "payment_method", existing_transaction.payment_method
-        ),
-        "category": update_data.get("category", existing_transaction.category),
-        "description": update_data.get("description", existing_transaction.description),
-        "reference_number": update_data.get(
-            "reference_number", existing_transaction.reference_number
-        ),
-        "taxes": update_data.get("taxes", existing_transaction.taxes),
-        "items": update_data.get("items", existing_transaction.items or []),
-    }
-
-    transaction_full_update = TransactionCreate(**full_data)
-
-    updated_transaction = transaction_crud.update(
-        db=db, transaction_id=transaction_id, transaction_update=transaction_full_update
-    )
+    service = get_transaction_service(db)
+    updated_transaction = service.update_transaction(transaction_id, transaction_update)
 
     if not updated_transaction:
         raise HTTPException(
@@ -227,7 +184,8 @@ def delete_transaction(
 
     This action cannot be undone.
     """
-    success = transaction_crud.delete(db=db, transaction_id=transaction_id)
+    service = get_transaction_service(db)
+    success = service.delete_transaction(transaction_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Transaction not found"
@@ -253,7 +211,8 @@ def get_monthly_summary(
     - **Transaction count** for the month
     - **Category breakdown** showing amounts per category
     """
-    summary_data = transaction_crud.get_monthly_summary(db=db, year=year, month=month)
+    service = get_transaction_service(db)
+    summary_data = service.get_monthly_summary(year, month)
     return TransactionSummary(**summary_data)
 
 
@@ -279,7 +238,8 @@ def search_transactions(
 
     Returns up to the specified limit of matching transactions.
     """
-    return transaction_crud.search(db=db, search_term=q, limit=limit)
+    service = get_transaction_service(db)
+    return service.search_transactions(q, limit)
 
 
 @router.get(
@@ -296,17 +256,5 @@ def get_totals_by_type(
 
     Returns totals for expenses, income, savings, and investments.
     """
-    totals = {}
-    for transaction_type in ModelTransactionType:
-        total = transaction_crud.get_total_by_type(
-            db=db, transaction_type=transaction_type
-        )
-        totals[transaction_type.value] = total
-
-    return {
-        "totals": totals,
-        "net_worth": totals.get("income", 0)
-        - totals.get("expense", 0)
-        + totals.get("saving", 0)
-        + totals.get("investment", 0),
-    }
+    service = get_transaction_service(db)
+    return service.get_totals_by_type()

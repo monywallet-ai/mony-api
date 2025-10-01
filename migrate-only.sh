@@ -4,7 +4,6 @@ set -e
 echo "🔄 MODO: SOLO MIGRACIONES (sin instalar dependencias)"
 echo "📅 Timestamp: $(date)"
 
-# Verificar que existe el venv (debe existir de deploy anterior)
 VENV_PATH="/home/site/wwwroot/.venv"
 if [ ! -d "$VENV_PATH" ]; then
     echo "❌ ERROR: No existe venv. Debe hacer deploy normal primero."
@@ -12,28 +11,23 @@ if [ ! -d "$VENV_PATH" ]; then
     exit 1
 fi
 
-# Activar venv existente
 source "$VENV_PATH/bin/activate"
 
-# Verificar que alembic está disponible
 if ! command -v alembic &>/dev/null; then
     echo "❌ ERROR: Alembic no encontrado. Debe hacer deploy normal primero."
     exit 1
 fi
 
-# Ejecutar SOLO migraciones
-echo "🔧 Ejecutando migraciones..."
+echo "🔧 Ejecuting migrations..."
 alembic upgrade head
 
-echo "✅ Migraciones completadas!"
-echo "📋 Estado actual de la DB:"
+echo "✅ Migrations successfully executed."
+echo "📋 Actual status database:"
 alembic current
 
-# Configurar workers y lanzar la aplicación (usando el venv existente)
 WORKERS=${WORKERS:-3}
-echo "🚀 Iniciando aplicación con migraciones aplicadas ($WORKERS workers)..."
+echo "🚀  Starting Gunicorn with $WORKERS workers..."
 
-# Launch application (usando dependencias ya instaladas)
 exec gunicorn app.main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --workers $WORKERS \
