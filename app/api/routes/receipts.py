@@ -2,13 +2,14 @@ import mimetypes
 import base64
 import json
 from typing import List
-from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status, Depends
 from openai import OpenAI
 
 from app.core.settings import settings
 from app.schemas.receipt import ReceiptAnalysisResponse, ErrorResponse
 from app.core.logging import receipt_logger
 from app.core.log_utils import log_openai_request
+from app.core.rate_limiter import receipt_rate_limit
 
 router = APIRouter(prefix="/receipts", tags=["Receipts"])
 
@@ -188,6 +189,7 @@ async def analyze_receipt(
         description="Receipt image file (PNG, JPEG, or JPG format, max 10MB)",
         media_type="image/*",
     ),
+    _: None = Depends(receipt_rate_limit),
 ) -> ReceiptAnalysisResponse:
     """
     Upload and analyze a receipt image to extract structured financial data.

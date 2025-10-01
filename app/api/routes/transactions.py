@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.crud.transaction import transaction_crud
+from app.core.rate_limiter import general_rate_limit
 from app.schemas.transaction import (
     TransactionCreate,
     TransactionResponse,
@@ -26,7 +27,9 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
     description="Create a new financial transaction with all the necessary details.",
 )
 def create_transaction(
-    transaction: TransactionCreate, db: Session = Depends(get_db)
+    transaction: TransactionCreate,
+    db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
 ) -> TransactionResponse:
     """
     Create a new transaction with the following information:
@@ -73,6 +76,7 @@ def get_transactions(
     ),
     sort_order: str = Query("desc", description="Sort order (asc or desc)"),
     db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
 ) -> TransactionListResponse:
     """
     Get a paginated list of transactions with optional filtering:
@@ -125,7 +129,9 @@ def get_transactions(
     description="Retrieve a specific transaction by its ID.",
 )
 def get_transaction(
-    transaction_id: int, db: Session = Depends(get_db)
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
 ) -> TransactionResponse:
     """
     Get a specific transaction by ID.
@@ -150,6 +156,7 @@ def update_transaction(
     transaction_id: int,
     transaction_update: TransactionUpdate,
     db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
 ) -> TransactionResponse:
     """
     Update an existing transaction.
@@ -210,7 +217,11 @@ def update_transaction(
     summary="Delete a transaction",
     description="Delete a specific transaction by its ID.",
 )
-def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
+):
     """
     Delete a transaction permanently.
 
@@ -233,6 +244,7 @@ def get_monthly_summary(
     year: int = Query(..., description="Year (e.g., 2024)"),
     month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
     db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
 ) -> TransactionSummary:
     """
     Get a comprehensive summary of transactions for a specific month:
@@ -255,6 +267,7 @@ def search_transactions(
     q: str = Query(..., min_length=2, description="Search term (minimum 2 characters)"),
     limit: int = Query(20, ge=1, le=50, description="Maximum number of results"),
     db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
 ) -> List[TransactionResponse]:
     """
     Search transactions by text across multiple fields:
@@ -274,7 +287,10 @@ def search_transactions(
     summary="Get transaction totals by type",
     description="Get total amounts for each transaction type.",
 )
-def get_totals_by_type(db: Session = Depends(get_db)) -> dict:
+def get_totals_by_type(
+    db: Session = Depends(get_db),
+    _: None = Depends(general_rate_limit),
+) -> dict:
     """
     Get total amounts grouped by transaction type.
 
